@@ -10,6 +10,12 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'preparing', 'ready', 'completed', 'cancelled'],
     default: 'pending'
   },
+  transactionId: { type: String, unique: true, required: true },
+  payment: {
+    method: { type: String }, // e.g., UPI, card, cash
+    status: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
+    details: { type: Object }, // store payment gateway response or info
+  },
   note: { type: String },
   createdAt: { type: Date, default: Date.now }
 });

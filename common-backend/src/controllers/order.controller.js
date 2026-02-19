@@ -2,6 +2,33 @@ const asyncHandler = require('express-async-handler');
 const Order = require('../models/Order');
 const Menu = require('../models/Menu');
 const Product = require('../models/Product');
+const crypto = require('crypto');
+
+// Confirm/process order by transactionId (staff action)
+exports.confirmOrderByTransaction = asyncHandler(async (req, res) => {
+  const { transactionId, paymentMethod, paymentDetails } = req.body;
+  if (!transactionId) {
+    res.status(400);
+    throw new Error('Transaction ID required');
+  }
+  const order = await Order.findOne({ transactionId });
+  if (!order) {
+    res.status(404);
+    throw new Error('Order not found');
+  }
+  if (order.status !== 'pending') {
+    res.status(400);
+    throw new Error('Order already processed');
+  }
+  order.status = 'preparing';
+  order.payment = {
+    method: paymentMethod || 'unknown',
+    status: 'paid',
+    details: paymentDetails || {},
+  };
+  await order.save();
+  res.json({ success: true, order });
+});
 
 exports.createOrder = asyncHandler(async (req, res) => {
   const { items, note } = req.body;
@@ -42,8 +69,17 @@ exports.createOrder = asyncHandler(async (req, res) => {
     }
   }
 
-  const order = await Order.create({ student: req.user._id, items: prepared, total, note });
-  res.status(201).json(order);
+  // Generate unique transactionId
+  const transactionId = crypto.randomBytes(8).toString('hex');
+  const order = await Order.create({
+    student: req.user._id,
+    items: prepared,
+    total,
+    note,
+    transactionId,
+    payment: { status: 'pending' }
+  });
+  res.status(201).json({ orderId: order._id, transactionId });
 });
 
 exports.listOrders = asyncHandler(async (req, res) => {

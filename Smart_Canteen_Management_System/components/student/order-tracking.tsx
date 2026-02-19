@@ -93,6 +93,19 @@ export function OrderTracking() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Track Your Order</h1>
         <p className="text-muted-foreground">Order #{order.id}</p>
+        {order.transactionId && (
+          <div className="mt-2 text-sm font-mono">
+            Transaction ID: <span className="bg-muted px-2 py-1 rounded">{order.transactionId}</span>
+          </div>
+        )}
+        {order.payment && (
+          <div className="mt-1 text-xs">
+            Payment Status: <span className="font-semibold">{order.payment.status}</span>
+            {order.payment.method && (
+              <span className="ml-2">({order.payment.method})</span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Order Status Timeline */}

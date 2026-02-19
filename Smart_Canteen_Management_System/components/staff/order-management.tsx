@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Clock, ChefHat, Package, CheckCircle2 } from "lucide-react"
 import type { Order } from "@/lib/types"
 import { fetchOrders, updateOrderStatus } from "@/lib/api"
+import { OrderQRConfirm } from "./order-qr-confirm"
 
 export function OrderManagement() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -45,58 +46,61 @@ export function OrderManagement() {
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-      {error && <div className="text-sm text-destructive text-center">{error}</div>}
-      <TabsList className="grid w-full grid-cols-4">
-        <TabsTrigger value="pending" className="flex items-center gap-2">
-          <Clock className="w-4 h-4" />
-          Pending ({filterOrdersByStatus("pending").length})
-        </TabsTrigger>
-        <TabsTrigger value="preparing" className="flex items-center gap-2">
-          <ChefHat className="w-4 h-4" />
-          Preparing ({filterOrdersByStatus("preparing").length})
-        </TabsTrigger>
-        <TabsTrigger value="ready" className="flex items-center gap-2">
-          <Package className="w-4 h-4" />
-          Ready ({filterOrdersByStatus("ready").length})
-        </TabsTrigger>
-        <TabsTrigger value="completed" className="flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4" />
-          Completed ({filterOrdersByStatus("completed").length})
-        </TabsTrigger>
-      </TabsList>
+    <>
+      <OrderQRConfirm />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 mt-8">
+        {error && <div className="text-sm text-destructive text-center">{error}</div>}
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="pending" className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            Pending ({filterOrdersByStatus("pending").length})
+          </TabsTrigger>
+          <TabsTrigger value="preparing" className="flex items-center gap-2">
+            <ChefHat className="w-4 h-4" />
+            Preparing ({filterOrdersByStatus("preparing").length})
+          </TabsTrigger>
+          <TabsTrigger value="ready" className="flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            Ready ({filterOrdersByStatus("ready").length})
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />
+            Completed ({filterOrdersByStatus("completed").length})
+          </TabsTrigger>
+        </TabsList>
 
-      <TabsContent value="pending" className="space-y-4">
-        <OrderList
-          orders={filterOrdersByStatus("pending")}
-          onUpdateStatus={changeOrderStatus}
-          nextStatus="preparing"
-          actionLabel="Start Preparing"
-        />
-      </TabsContent>
+        <TabsContent value="pending" className="space-y-4">
+          <OrderList
+            orders={filterOrdersByStatus("pending")}
+            onUpdateStatus={changeOrderStatus}
+            nextStatus="preparing"
+            actionLabel="Start Preparing"
+          />
+        </TabsContent>
 
-      <TabsContent value="preparing" className="space-y-4">
-        <OrderList
-          orders={filterOrdersByStatus("preparing")}
-          onUpdateStatus={changeOrderStatus}
-          nextStatus="ready"
-          actionLabel="Mark as Ready"
-        />
-      </TabsContent>
+        <TabsContent value="preparing" className="space-y-4">
+          <OrderList
+            orders={filterOrdersByStatus("preparing")}
+            onUpdateStatus={changeOrderStatus}
+            nextStatus="ready"
+            actionLabel="Mark as Ready"
+          />
+        </TabsContent>
 
-      <TabsContent value="ready" className="space-y-4">
-        <OrderList
-          orders={filterOrdersByStatus("ready")}
-          onUpdateStatus={changeOrderStatus}
-          nextStatus="completed"
-          actionLabel="Mark as Completed"
-        />
-      </TabsContent>
+        <TabsContent value="ready" className="space-y-4">
+          <OrderList
+            orders={filterOrdersByStatus("ready")}
+            onUpdateStatus={changeOrderStatus}
+            nextStatus="completed"
+            actionLabel="Mark as Completed"
+          />
+        </TabsContent>
 
-      <TabsContent value="completed" className="space-y-4">
-        <OrderList orders={filterOrdersByStatus("completed")} onUpdateStatus={changeOrderStatus} />
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="completed" className="space-y-4">
+          <OrderList orders={filterOrdersByStatus("completed")} onUpdateStatus={changeOrderStatus} />
+        </TabsContent>
+      </Tabs>
+    </>
   )
 }
 

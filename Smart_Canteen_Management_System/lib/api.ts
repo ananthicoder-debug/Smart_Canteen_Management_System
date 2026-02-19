@@ -130,8 +130,9 @@ export async function deleteMenuItem(id: string): Promise<void> {
 }
 
 export async function createOrder(items: { menuItem: string; qty: number }[], note?: string) {
-  const order = await apiFetch<any>("/api/orders", { method: "POST", body: { items, note } })
-  return normalizeOrder(order)
+  // Use new endpoint that returns transactionId
+  const res = await apiFetch<any>("/api/orders/create", { method: "POST", body: { items, note } })
+  return res; // { orderId, transactionId }
 }
 
 export async function fetchOrders(): Promise<Order[]> {

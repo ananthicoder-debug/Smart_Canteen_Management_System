@@ -2,29 +2,36 @@
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Minus, Plus, Trash2, ShoppingBag } from "lucide-react"
+import { Minus, Plus, Trash2, ShoppingBag, Info } from "lucide-react"
 import { useCart } from "@/lib/hooks/use-cart"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import Link from "next/link"
 import { createOrder } from "@/lib/api"
+import QRCode from "react-qr-code"
 
 export function CartView() {
   const { items, updateQuantity, removeItem, clearCart, getTotal } = useCart()
   const router = useRouter()
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [transactionId, setTransactionId] = useState<string | null>(null)
+  const [orderId, setOrderId] = useState<string | null>(null)
+  const [enteredTransactionId, setEnteredTransactionId] = useState("")
+  const [isVerified, setIsVerified] = useState(false)
+  const [verificationAttempted, setVerificationAttempted] = useState(false)
+  const [verificationError, setVerificationError] = useState<string | null>(null)
 
   const handleCheckout = async () => {
     setIsProcessing(true)
     setError(null)
-
     try {
-      const order = await createOrder(
+      const res = await createOrder(
         items.map((item) => ({ menuItem: item.id, qty: item.quantity })),
       )
       clearCart()
-      router.push(`/student/order-tracking?orderId=${order.id}`)
+      setTransactionId(res.transactionId)
+      setOrderId(res.orderId)
     } catch (err: any) {
       setError(err.message || "Failed to place order")
     } finally {
@@ -32,6 +39,101 @@ export function CartView() {
     }
   }
 
+  const handleVerifyPayment = () => {
+    setVerificationAttempted(true)
+    setVerificationError(null)
+
+    // Simple verification: check if entered ID matches the generated transaction ID
+    if (enteredTransactionId.trim() === transactionId) {
+      setIsVerified(true)
+      setVerificationError(null)
+    } else {
+      setVerificationError("Transaction ID does not match. Please verify and try again.")
+    }
+  }
+
+  if (transactionId && orderId) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* QR Code Section */}
+        <div className="bg-card border border-border rounded-xl p-8 text-center">
+          <h2 className="text-2xl font-bold mb-2">Order Placed Successfully!</h2>
+          <p className="text-muted-foreground mb-6">Scan the QR code at the counter to receive your order</p>
+          
+          <div className="bg-background rounded-lg p-6 inline-block mb-4">
+            <QRCode value={transactionId} size={160} />
+          </div>
+          
+          <div className="mb-4">
+            <p className="text-sm text-muted-foreground mb-2">Transaction ID:</p>
+            <div className="font-mono text-lg bg-muted p-3 rounded border border-border break-all">
+              {transactionId}
+            </div>
+          </div>
+        </div>
+
+        {/* Payment Verification Section */}
+        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+          <div className="flex gap-3 mb-4">
+            <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-semibold text-blue-900 dark:text-blue-100 mb-1">Payment Verification Required</p>
+              <p className="text-blue-800 dark:text-blue-200 text-xs">
+                In production, this would use Razorpay for secure online payments. For this prototype, please verify your transaction ID below to confirm payment.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">Enter your Transaction ID to verify payment:</label>
+              <input
+                type="text"
+                value={enteredTransactionId}
+                onChange={(e) => setEnteredTransactionId(e.target.value)}
+                placeholder="Enter or paste the transaction ID here"
+                className="w-full px-4 py-2 border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm"
+              />
+            </div>
+
+            {verificationError && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 text-sm text-destructive">
+                {verificationError}
+              </div>
+            )}
+
+            {isVerified && (
+              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 text-sm text-green-700 dark:text-green-200">
+                ✓ Payment verified successfully! Your order has been confirmed.
+              </div>
+            )}
+
+            <Button
+              onClick={handleVerifyPayment}
+              disabled={!enteredTransactionId.trim() || isVerified}
+              className="w-full"
+              variant={isVerified ? "secondary" : "default"}
+            >
+              {isVerified ? "Payment Verified" : "Verify Payment"}
+            </Button>
+          </div>
+        </div>
+
+        {/* Track Order Button */}
+        <Button
+          asChild
+          className="w-full"
+          disabled={!isVerified}
+          size="lg"
+          variant={isVerified ? "default" : "outline"}
+        >
+          <Link href={`/student/order-tracking?orderId=${orderId}`}>
+            {isVerified ? "Track Your Order" : "Verify Payment to Continue"}
+          </Link>
+        </Button>
+      </div>
+    )
+  }
   if (items.length === 0) {
     return (
       <div className="max-w-2xl mx-auto">
