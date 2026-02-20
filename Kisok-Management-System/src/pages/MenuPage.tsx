@@ -28,6 +28,13 @@ const MenuPage: React.FC<MenuPageProps> = ({ products, suggestedItems, addToCart
   const [searchTerm, setSearchTerm] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const [waitingForTap, setWaitingForTap] = useState(false);
+  const [tapMessage, setTapMessage] = useState("");
+
+  // Arduino endpoint (uses static IP from Final.ino)
+  const ARDUINO_URL_BASE = "http://192.168.100.108";
+  // Example expected UID stored in DB (sample provided by user)
+  const EXPECTED_UID = "8FDA8A1F";
 
   const highlightMatch = (text: string, query: string): React.ReactNode => {
     if (!query) return text;
@@ -48,6 +55,28 @@ const MenuPage: React.FC<MenuPageProps> = ({ products, suggestedItems, addToCart
     <div className="mx-auto w-full max-w-6xl px-4">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <h2 className="text-2xl font-semibold text-slate-800">Today's Items</h2>
+        {/* Tap card UI: replace admission-number card with card-tap interaction */}
+        <div className="w-full max-w-sm">
+          <div className="glass-panel p-4">
+            <h4 className="text-sm font-semibold text-slate-700">Card Tap Verification</h4>
+            <p className="mt-2 text-xs text-slate-600">Tap your card on the reader to verify payment after checkout.</p>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                onClick={() => {
+                  setWaitingForTap(true);
+                  setTapMessage("Opening card tap window...");
+                  // Open Arduino verification URL in a new window; Arduino will handle detection and redirect back
+                  const url = `${ARDUINO_URL_BASE}/?id=${EXPECTED_UID}`;
+                  window.open(url, "arduino-tap", "width=480,height=640");
+                }}
+              >
+                Start Tap
+              </button>
+              {waitingForTap && <span className="text-xs text-slate-500">{tapMessage || "Waiting for card..."}</span>}
+            </div>
+          </div>
+        </div>
         <div className="relative w-full max-w-md">
           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
             <SearchIcon fontSize="small" />

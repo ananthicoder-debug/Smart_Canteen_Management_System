@@ -11,6 +11,7 @@ import Footer from "./components/Footer/Footer";
 import HomePage from "./pages/HomePage";
 import MenuPage from "./pages/MenuPage";
 import OrdersPage from "./pages/OrdersPage";
+import PaymentFailed from "./pages/PaymentFailed";
 
 type Product = {
   _id: string;
@@ -51,7 +52,7 @@ type FeedbackForm = {
 };
 
 type LayoutProps = {
-  page: "home" | "menu" | "orders";
+  page: "home" | "menu" | "orders" | "payment-failed";
 };
 
 const ShoppingCartIcon = FaShoppingCart as unknown as React.ComponentType<
@@ -78,12 +79,31 @@ const Layout: React.FC<LayoutProps> = ({ page }) => {
     message: "",
   });
   const [feedbackStatus, setFeedbackStatus] = useState("");
+  // Arduino endpoint (matches Final.ino static IP)
+  const ARDUINO_URL_BASE = "http://192.168.100.108";
+  // Expected UID will be fetched from backend for the current user when available
+  const [expectedUid, setExpectedUid] = useState<string | null>(null);
+
+  const fetchExpectedUid = async (adNo: string) => {
+    try {
+      const res = await axios.get(`/api/users/${encodeURIComponent(adNo)}`);
+      return res.data && res.data.uid ? res.data.uid : null;
+    } catch (err) {
+      return null;
+    }
+  };
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await axios.get<Product[]>("/api/products");
-        setProducts(response.data);
+        let response;
+        try {
+          response = await axios.get<Product[]>('/api/products');
+        } catch (err) {
+          // fallback to absolute backend URL if proxy isn't working
+          response = await axios.get<Product[]>('http://localhost:3000/api/products');
+        }
+        setProducts(response.data || []);
       } catch (error) {
         console.error("Error fetching products:", error);
       }
@@ -192,16 +212,12 @@ const Layout: React.FC<LayoutProps> = ({ page }) => {
     }
   };
 
-  const handleAdmissionConfirm = async (): Promise<void> => {
-    if (!admissionNumber) {
-      setCheckoutError("Please enter your admission number.");
-      return;
-    }
-    setShowAdmissionModal(false);
+  // Submit sale to backend and show receipt
+  const submitSale = async (userIdForSale: string) => {
     setCheckoutError("");
-    fetchUserSuggestions(admissionNumber);
+    fetchUserSuggestions(userIdForSale);
     const saleData: Sale = {
-      userId: admissionNumber,
+      userId: userIdForSale,
       items: cart.map((i) => ({
         id: i._id,
         name: i.name,
@@ -212,14 +228,37 @@ const Layout: React.FC<LayoutProps> = ({ page }) => {
       timestamp: Date.now(),
     };
     try {
-      await axios.post("/api/sales", saleData);
+      // Post sale to backend with fallback to absolute URL
+      try {
+        await axios.post("/api/sales", saleData);
+      } catch (err) {
+        // fallback to absolute backend URL if proxy isn't working
+        await axios.post("http://localhost:3000/api/sales", saleData);
+      }
+      
+      // Reduce stock for each item in the cart
+      for (const item of cart) {
+        try {
+          await axios.post("/api/products/update-quantity", {
+            id: item._id,
+            quantityChange: -item.quantity,
+          });
+        } catch (err) {
+          // fallback to absolute backend URL
+          await axios.post("http://localhost:3000/api/products/update-quantity", {
+            id: item._id,
+            quantityChange: -item.quantity,
+          });
+        }
+      }
+      
       if (cart.length > 0) {
         const doc = new jsPDF();
         doc.setFontSize(18);
         doc.text("Kiosk Vending Machine Invoice", 14, 22);
         doc.setFontSize(12);
         doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 30);
-        doc.text(`Admission Number: ${admissionNumber}`, 14, 36);
+        doc.text(`User ID: ${userIdForSale}`, 14, 36);
         const columns = ["Item", "Qty", "Price", "Subtotal"];
         const rows = cart.map((item) => [
           item.name,
@@ -249,9 +288,15 @@ const Layout: React.FC<LayoutProps> = ({ page }) => {
       setTimeout(() => setShowCheckoutToast(false), 3000);
       try {
         const response = await axios.get<Product[]>("/api/products");
-        setProducts(response.data);
+        setProducts(response.data || []);
       } catch (error) {
-        console.error("Error fetching products after purchase:", error);
+        // fallback to absolute backend URL
+        try {
+          const response = await axios.get<Product[]>("http://localhost:3000/api/products");
+          setProducts(response.data || []);
+        } catch (err) {
+          console.error("Error fetching products after purchase:", err);
+        }
       }
     } catch (err) {
       console.error("Checkout failed:", err);
@@ -316,6 +361,7 @@ const Layout: React.FC<LayoutProps> = ({ page }) => {
           />
         )}
         {page === "orders" && <OrdersPage />}
+        {page === "payment-failed" && <PaymentFailed />}
 
         <CartModal
           show={showCartModal}
@@ -337,36 +383,93 @@ const Layout: React.FC<LayoutProps> = ({ page }) => {
 
         <ModalShell
           open={showAdmissionModal}
-          title="Enter Admission Number"
-          onClose={() => setShowAdmissionModal(false)}
+          title="Tap Card to Verify"
+          onClose={() => {
+            setShowAdmissionModal(false);
+            setAdmissionNumber("");
+          }}
           footer={
             <div className="flex justify-end gap-2">
               <button
                 className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-                onClick={() => setShowAdmissionModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
                 onClick={() => {
-                  handleAdmissionConfirm();
-                  setUserId(admissionNumber);
+                  setShowAdmissionModal(false);
+                  setAdmissionNumber("");
                 }}
               >
-                Confirm Payment
+                Cancel
               </button>
             </div>
           }
         >
-          <label className="text-xs font-semibold text-slate-600">Admission Number</label>
-          <input
-            className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
-            type="text"
-            value={admissionNumber}
-            onChange={(e) => setAdmissionNumber(e.target.value)}
-            placeholder="Enter your admission number"
-          />
+          <div>
+            <p className="text-sm text-slate-600">Enter your admission number to verify your card:</p>
+            <input
+              className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
+              type="text"
+              value={admissionNumber}
+              onChange={(e) => setAdmissionNumber(e.target.value)}
+              placeholder="e.g., STU001"
+            />
+            <div className="mt-4 flex items-center gap-3">
+              <button
+                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                disabled={!admissionNumber.trim()}
+                onClick={async () => {
+                  if (!admissionNumber.trim()) {
+                    setCheckoutError("Please enter your admission number.");
+                    return;
+                  }
+                  // Fetch expected UID from backend for this admission number
+                  let uidToUse = await fetchExpectedUid(admissionNumber);
+                  if (!uidToUse) {
+                    setCheckoutError(`No card UID found for admission number: ${admissionNumber}`);
+                    return;
+                  }
+                  setExpectedUid(uidToUse);
+                  
+                  // Open Arduino verification window with expected UID
+                  const url = `${ARDUINO_URL_BASE}/?id=${uidToUse}`;
+                  const w = window.open(url, "arduino-tap", "width=480,height=640");
+                  if (!w) {
+                    setCheckoutError("Unable to open verification window. Please allow popups.");
+                    return;
+                  }
+                  // Poll child window for same-origin redirect back to kiosk (contains status)
+                  const interval = setInterval(() => {
+                    try {
+                      const href = w.location.href; // will throw until same-origin
+                      if (!href) return;
+                      const u = new URL(href);
+                      const status = u.searchParams.get("status");
+                      const reason = u.searchParams.get("reason");
+                      const id = u.searchParams.get("id");
+                      if (status === "success") {
+                        clearInterval(interval);
+                        w.close();
+                        setShowAdmissionModal(false);
+                        submitSale(admissionNumber);
+                        setUserId(admissionNumber);
+                        setAdmissionNumber("");
+                      } else if (u.pathname && u.pathname.includes("/payment-failed")) {
+                        clearInterval(interval);
+                        w.close();
+                        setShowAdmissionModal(false);
+                        setCheckoutError(reason ? `Payment failed: ${reason}` : "Payment failed.");
+                        // navigate user to payment failed page
+                        window.location.href = "/payment-failed" + (reason ? `?reason=${encodeURIComponent(reason)}` : "");
+                      }
+                    } catch (err) {
+                      // cross-origin until Arduino redirects back; ignore
+                    }
+                  }, 500);
+                }}
+              >
+                Start Tap
+              </button>
+              <span className="text-xs text-slate-500">Tap reader window opens — follow its instructions.</span>
+            </div>
+          </div>
         </ModalShell>
 
         <ModalShell

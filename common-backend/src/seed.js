@@ -41,6 +41,40 @@ const defaultKioskUser = {
   email: process.env.SEED_KIOSK_EMAIL || 'kiosk@innowah.local',
 };
 
+// Sample kiosk users with RFID card UIDs for testing
+const sampleKioskUsers = [
+  {
+    admissionNumber: 'STU001',
+    name: 'Blue Tag User',
+    department: 'CSE',
+    uid: '517D7E00', // Blue tag UID
+    wallet_balance: 1000,
+    password: 'student123',
+    role: 'user',
+    email: 'stu001@college.local',
+  },
+  {
+    admissionNumber: 'STU002',
+    name: 'White Card User',
+    department: 'CSE',
+    uid: '8FDA8A1F', // White card UID
+    wallet_balance: 1000,
+    password: 'student123',
+    role: 'user',
+    email: 'stu002@college.local',
+  },
+  {
+    admissionNumber: 'STU003',
+    name: 'Student ID User',
+    department: 'ECE',
+    uid: 'F300A4EC', // Student ID UID
+    wallet_balance: 1000,
+    password: 'student123',
+    role: 'user',
+    email: 'stu003@college.local',
+  },
+];
+
 async function seedUsers() {
   const admin = await User.findOne({ email: defaultUsers.admin.email });
   if (!admin) {
@@ -72,6 +106,17 @@ async function seedUsers() {
     console.log('Created kiosk user:', defaultKioskUser.admissionNumber);
   } else {
     console.log('Kiosk user already exists:', defaultKioskUser.admissionNumber);
+  }
+
+  // Seed sample kiosk users with RFID card UIDs
+  for (const sampleUser of sampleKioskUsers) {
+    const existing = await KioskUser.findOne({ admissionNumber: sampleUser.admissionNumber });
+    if (!existing) {
+      await KioskUser.create(sampleUser);
+      console.log(`Created sample kiosk user: ${sampleUser.admissionNumber} (UID: ${sampleUser.uid})`);
+    } else {
+      console.log(`Sample user already exists: ${sampleUser.admissionNumber}`);
+    }
   }
 }
 

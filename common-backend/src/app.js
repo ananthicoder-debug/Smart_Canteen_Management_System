@@ -32,8 +32,10 @@ app.use(compression());
 app.use(cookieParser());
 const corsOptions = {
   origin: (origin, callback) => {
-    if (process.env.NODE_ENV === 'development') return callback(null, true);
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    // For development, always allow localhost origins
+    if (!origin || origin.includes('localhost') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,

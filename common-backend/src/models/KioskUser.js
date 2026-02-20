@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 
 const kioskUserSchema = new mongoose.Schema({
   admissionNumber: { type: String, required: true, unique: true },
+  // Card UID (stored in DB when provided). Unique where present.
+  uid: { type: String, unique: true, sparse: true },
   name: { type: String, required: true },
   department: { type: String },
   wallet_balance: { type: Number, default: 0 },
